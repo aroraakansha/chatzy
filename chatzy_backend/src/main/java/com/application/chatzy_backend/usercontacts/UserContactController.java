@@ -1,0 +1,53 @@
+package com.application.chatzy_backend.usercontacts;
+
+import com.application.chatzy_backend.usercontacts.dto.UserContactResponseDto;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.UUID;
+import java.util.HashMap;
+import java.util.Map;
+
+@RestController
+@RequestMapping("/api/contacts")
+@RequiredArgsConstructor
+public class UserContactController {
+
+    private final UserContactService contactService;
+    private final com.application.chatzy_backend.user.UserRepository userRepository;
+
+    @GetMapping
+    public ResponseEntity<List<UserContactResponseDto>> getMyContacts(Authentication authentication) {
+        UUID ownerId = currentUserId(authentication);
+        List<UserContactResponseDto> result = contactService.getContactsForUserDto(ownerId);
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/sync-status")
+    public ResponseEntity<Map<String, Boolean>> checkGoogleCredentials(Authentication authentication) {
+        UUID ownerId = currentUserId(authentication);
+        boolean hasCredentials = contactService.hasGoogleCredentials(ownerId);
+        Map<String, Boolean> response = new HashMap<>();
+        response.put("hasGoogleCredentials", hasCredentials);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/sync")
+    public ResponseEntity<String> syncContacts(Authentication authentication) {
+        UUID ownerId = currentUserId(authentication);
+        contactService.syncGoogleContacts(ownerId);
+        return ResponseEntity.ok("Contacts synced successfully.");
+    }
+
+    private UUID currentUserId(Authentication authentication) {
+        String email = authentication.getName();
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalStateException("Authenticated user not found"))
+                .getId();
+    }
+
+}
+
