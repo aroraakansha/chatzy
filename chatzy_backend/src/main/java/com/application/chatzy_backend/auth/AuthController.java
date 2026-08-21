@@ -51,9 +51,9 @@ public class AuthController {
         return new RedirectView("/oauth2/authorization/google");
     }
 
-    @PostMapping("/sign-up")
+    @PostMapping("/sign-up/email")
     public ResponseEntity<String> sendOtp(@RequestBody SignUpRequest request) {
-        authService.storePendingRegistration(request.getEmail(), request.getPhone(), request.getPassword(), request.getDisplayName());
+        authService.storePendingRegistration(request.getEmail(), request.getPhone(), request.getPassword(), request.getFullName());
         authService.sendOtpForRegistration(request.getEmail(), request.getPhone());
         return ResponseEntity.ok("OTP sent");
     }

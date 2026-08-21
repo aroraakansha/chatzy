@@ -51,7 +51,9 @@ public class SecurityConfig {
                                 "/ws-chat/**",    // SockJS WebSocket sub-paths
                                 "/ws-stomp",      // raw STOMP WebSocket endpoint
                                 "/ws-stomp/**",    // raw STOMP WebSocket sub-paths
-                                "/websocket-test.html"  // WebSocket test client
+                                "/websocket-test.html",  // WebSocket test client
+                                "/health",
+                                "/v1/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )

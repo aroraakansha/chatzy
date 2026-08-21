@@ -43,11 +43,12 @@ public class UserContactController {
     }
 
     private UUID currentUserId(Authentication authentication) {
-        String email = authentication.getName();
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("Authenticated user not found"))
+        String identifier = authentication.getName().trim();
+        return userRepository.findByEmail(identifier)
+                .or(() -> userRepository.findByUsername(identifier))
+                .or(() -> userRepository.findByPhone(identifier))
+                .orElseThrow(() -> new IllegalStateException("Authenticated user not found for the current session. Please sign in again."))
                 .getId();
     }
 
 }
-
