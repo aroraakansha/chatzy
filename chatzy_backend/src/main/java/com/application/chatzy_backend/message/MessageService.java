@@ -1,10 +1,15 @@
 package com.application.chatzy_backend.message;
 
 import com.application.chatzy_backend.enums.MessageStatus;
+import com.application.chatzy_backend.enums.MessageType;
+import com.application.chatzy_backend.message.dto.VoiceMessageRequest;
+import com.application.chatzy_backend.message.dto.MediaMessageRequest;
+import com.application.chatzy_backend.s3.S3Service;
 import com.application.chatzy_backend.user.User;
 import com.application.chatzy_backend.user.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -12,6 +17,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -22,6 +28,9 @@ public class MessageService {
     private final MessageRepository messageRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final UserRepository userRepository;
+
+    @Autowired(required = false)
+    private S3Service s3Service;
 
     public MesssageDto saveAndSendMessage(MesssageDto incoming) {
 
@@ -38,9 +47,13 @@ public class MessageService {
 
         // resolve the principal names (these must match the Principal.name set on CONNECT)
         String recipientPrincipal = resolvePrincipalName(saved.getRecipientId());
+        String senderPrincipal = resolvePrincipalName(saved.getSenderId());
 
         log.info("Sending message - Recipient ID: {}, Resolved Principal: {}, Destination: /user/{}/queue/messages",
                 saved.getRecipientId(), recipientPrincipal, recipientPrincipal);
+        log.info("Sending message - Sender ID: {}, Resolved Principal: {}, Destination: /user/{}/queue/messages",
+                saved.getSenderId(), senderPrincipal, senderPrincipal);
+        log.info("Message content: {}", outgoing.getContent());
 
         if (recipientPrincipal != null) {
             messagingTemplate.convertAndSendToUser(
@@ -53,11 +66,6 @@ public class MessageService {
             log.warn("Could not resolve principal name for recipientId={}", saved.getRecipientId());
         }
 
-        String senderPrincipal = resolvePrincipalName(saved.getSenderId());
-
-        log.info("Sending message - Sender ID: {}, Resolved Principal: {}, Destination: /user/{}/queue/messages",
-                saved.getSenderId(), senderPrincipal, senderPrincipal);
-
         if (senderPrincipal != null) {
             messagingTemplate.convertAndSendToUser(
                     senderPrincipal,
@@ -69,6 +77,84 @@ public class MessageService {
             log.warn("Could not resolve principal name for senderId={}", saved.getSenderId());
         }
 
+        return outgoing;
+    }
+
+    public MesssageDto saveAndSendVoiceMessage(VoiceMessageRequest request) {
+        if (s3Service == null) {
+            throw new IllegalStateException("S3 service is not configured. Please configure AWS credentials to upload voice messages.");
+        }
+
+        // Upload audio file to S3
+        String audioUrl = s3Service.uploadFile(request.getAudioFile());
+
+        // Create message entity
+        Message entity = Message.builder()
+                .id(UUID.randomUUID())
+                .chatId(request.getChatId())
+                .senderId(request.getSenderId())
+                .recipientId(request.getRecipientId())
+                .mediaUrl(audioUrl)
+                .mediaMimeType(request.getAudioFile().getContentType())
+                .mediaSizeBytes(request.getAudioFile().getSize())
+                .mediaDurationSecs(request.getDurationSeconds())
+                .type(MessageType.AUDIO)
+                .status(MessageStatus.SENT)
+                .sentAt(LocalDateTime.now())
+                .build();
+
+        Message saved = messageRepository.save(entity);
+        MesssageDto outgoing = toDto(saved);
+
+        // Notify recipient
+        String recipientPrincipal = resolvePrincipalName(saved.getRecipientId());
+        if (recipientPrincipal != null) {
+            messagingTemplate.convertAndSendToUser(
+                    recipientPrincipal,
+                    "/queue/messages",
+                    outgoing
+            );
+            log.info("Voice message sent to recipient: {}", recipientPrincipal);
+        }
+
+        // Notify sender
+        String senderPrincipal = resolvePrincipalName(saved.getSenderId());
+        if (senderPrincipal != null) {
+            messagingTemplate.convertAndSendToUser(
+                    senderPrincipal,
+                    "/queue/messages",
+                    outgoing
+            );
+            log.info("Voice message sent to sender: {}", senderPrincipal);
+        }
+
+        return outgoing;
+    }
+
+    public MesssageDto saveAndSendMediaMessage(MediaMessageRequest request) {
+        if (s3Service == null) {
+            throw new IllegalStateException("S3 service is not configured. Please configure AWS credentials to upload media messages.");
+        }
+
+        String mediaUrl = s3Service.uploadFile(request.getFile());
+        Message entity = Message.builder()
+                .id(UUID.randomUUID())
+                .chatId(request.getChatId())
+                .senderId(request.getSenderId())
+                .recipientId(request.getRecipientId())
+                .content(request.getContent())
+                .mediaUrl(mediaUrl)
+                .mediaMimeType(request.getFile().getContentType())
+                .mediaSizeBytes(request.getFile().getSize())
+                .type(mediaTypeFor(request.getFile().getContentType()))
+                .status(MessageStatus.SENT)
+                .sentAt(LocalDateTime.now())
+                .build();
+
+        Message saved = messageRepository.save(entity);
+        MesssageDto outgoing = toDto(saved);
+        outgoing.setClientTempId(request.getClientTempId());
+        notifyMessageParticipants(saved, outgoing);
         return outgoing;
     }
 
@@ -85,6 +171,18 @@ public class MessageService {
 
         return messageRepository
                 .findByChatIdOrderBySentAtDesc(chatId, pageable)
+                .map(this::toDto);
+    }
+
+    public Page<MesssageDto> searchMessages(List<UUID> chatIds, String query, Pageable pageable) {
+        return messageRepository
+                .searchMessages(chatIds, query, pageable)
+                .map(this::toDto);
+    }
+
+    public Page<MesssageDto> searchMessagesInChat(UUID chatId, String query, Pageable pageable) {
+        return messageRepository
+                .searchMessagesInChat(chatId, query, pageable)
                 .map(this::toDto);
     }
 
@@ -149,5 +247,29 @@ public class MessageService {
         return userRepository.findById(userId)
                 .map(User::getEmail)
                 .orElse(null);
+    }
+
+    private String resolvePrincipalName(String email) {
+        if (email == null) {
+            return null;
+        }
+        return email;
+    }
+
+    private MessageType mediaTypeFor(String mimeType) {
+        if (mimeType != null && mimeType.startsWith("image/")) return MessageType.IMAGE;
+        if (mimeType != null && mimeType.startsWith("video/")) return MessageType.VIDEO;
+        return MessageType.FILE;
+    }
+
+    private void notifyMessageParticipants(Message message, MesssageDto outgoing) {
+        String recipientPrincipal = resolvePrincipalName(message.getRecipientId());
+        if (recipientPrincipal != null) {
+            messagingTemplate.convertAndSendToUser(recipientPrincipal, "/queue/messages", outgoing);
+        }
+        String senderPrincipal = resolvePrincipalName(message.getSenderId());
+        if (senderPrincipal != null) {
+            messagingTemplate.convertAndSendToUser(senderPrincipal, "/queue/messages", outgoing);
+        }
     }
 }

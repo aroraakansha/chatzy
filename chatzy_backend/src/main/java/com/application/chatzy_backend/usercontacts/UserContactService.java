@@ -1,5 +1,6 @@
 package com.application.chatzy_backend.usercontacts;
 
+import com.application.chatzy_backend.email.EmailService;
 import com.application.chatzy_backend.exception.GoogleCredentialNotFoundException;
 import com.application.chatzy_backend.googlecontactsaccess.GoogleContactDto;
 import com.application.chatzy_backend.googlecontactsaccess.GoogleCredential;
@@ -7,9 +8,11 @@ import com.application.chatzy_backend.googlecontactsaccess.GoogleCredentialRepos
 import com.application.chatzy_backend.googlecontactsaccess.GooglePeopleApiContact;
 import com.application.chatzy_backend.user.User;
 import com.application.chatzy_backend.user.UserRepository;
+import com.application.chatzy_backend.usercontacts.dto.AddContactRequest;
 import com.application.chatzy_backend.usercontacts.dto.UserContactResponseDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +29,10 @@ public class UserContactService {
     private final UserRepository userRepository;
     private final GoogleCredentialRepository googleCredentialRepository;
     private final GooglePeopleApiContact googlePeopleApiContact;
+    private final EmailService emailService;
+
+    @Value("${app.invitation.link:https://chatzy.app/download}")
+    private String invitationLink;
 
     @Transactional(readOnly = true)
     public List<UserContact> getContactsForUser(UUID ownerId) {
@@ -124,9 +131,77 @@ public class UserContactService {
             }
         }
 
-        // Return only contacts that have matched users (active users in the application)
+        // Return every saved contact. The UI marks contacts who have not joined Chatzy yet.
         return userContacts.stream()
-                .filter(contact -> contact.getMatchedUser() != null)
+                .map(UserContactResponseDto::from)
+                .toList();
+    }
+
+    @Transactional
+    public UserContactResponseDto addContact(UUID ownerId, AddContactRequest request) {
+        User owner = userRepository.findById(ownerId)
+                .orElseThrow(() -> new IllegalStateException("Owner user not found"));
+
+        // Check if contact already exists
+        if (request.getContactEmail() != null && !request.getContactEmail().isBlank()) {
+            if (contactRepository.existsByOwnerIdAndContactEmail(ownerId, request.getContactEmail())) {
+                throw new IllegalStateException("Contact with this email already exists");
+            }
+        }
+        if (request.getContactPhone() != null && !request.getContactPhone().isBlank()) {
+            if (contactRepository.existsByOwnerIdAndContactPhone(ownerId, request.getContactPhone())) {
+                throw new IllegalStateException("Contact with this phone already exists");
+            }
+        }
+
+        UserContact contact = UserContact.builder()
+                .owner(owner)
+                .contactName(request.getContactName())
+                .contactEmail(request.getContactEmail())
+                .contactPhone(request.getContactPhone())
+                .source("MANUAL")
+                .build();
+
+        contact = contactRepository.save(contact);
+
+        // Try to match with existing user
+        Optional<User> matchedUser = Optional.empty();
+        if (request.getContactEmail() != null && !request.getContactEmail().isBlank()) {
+            matchedUser = userRepository.findByEmail(request.getContactEmail().trim());
+        }
+        if (matchedUser.isEmpty() && request.getContactPhone() != null && !request.getContactPhone().isBlank()) {
+            String normalizedPhone = request.getContactPhone().replaceAll("[^0-9]", "");
+            matchedUser = userRepository.findByPhone(normalizedPhone);
+        }
+
+        if (matchedUser.isPresent() && !matchedUser.get().getId().equals(ownerId)) {
+            contact.setMatchedUser(matchedUser.get());
+            contact = contactRepository.save(contact);
+            log.info("Contact matched with existing user: {}", matchedUser.get().getEmail());
+        } else {
+            // Contact is not a registered user, send invitation email
+            if (request.getContactEmail() != null && !request.getContactEmail().isBlank()) {
+                try {
+                    emailService.sendInvitationEmail(
+                            request.getContactEmail(),
+                            owner.getDisplayName(),
+                            invitationLink
+                    );
+                    log.info("Invitation email sent to: {}", request.getContactEmail());
+                } catch (Exception e) {
+                    log.error("Failed to send invitation email to: {}", request.getContactEmail(), e);
+                    // Don't fail the contact addition if email fails
+                }
+            }
+        }
+
+        return UserContactResponseDto.from(contact);
+    }
+
+    @Transactional(readOnly = true)
+    public List<UserContactResponseDto> searchContacts(UUID ownerId, String query) {
+        List<UserContact> contacts = contactRepository.searchContacts(ownerId, query);
+        return contacts.stream()
                 .map(UserContactResponseDto::from)
                 .toList();
     }

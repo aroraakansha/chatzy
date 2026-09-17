@@ -4,6 +4,8 @@ import com.application.chatzy_backend.enums.ChatType;
 import com.application.chatzy_backend.enums.MemberRole;
 import com.application.chatzy_backend.user.User;
 import com.application.chatzy_backend.user.UserRepository;
+import com.application.chatzy_backend.usercontacts.UserContact;
+import com.application.chatzy_backend.usercontacts.UserContactRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -19,8 +21,16 @@ public class ChatService {
     private final ChatRepository chatRepository;
     private final ChatMemberRepository chatMemberRepository;
     private final UserRepository userRepository;
+    private final UserContactRepository userContactRepository;
 
     public ChatDto createPrivateChat(PrivateChatRequestDto request) {
+        // Check if a private chat already exists between these two users
+        ChatDto existingChat = findExistingPrivateChat(request.getCurrentUserId(), request.getRecipientId());
+        if (existingChat != null) {
+            log.info("Private chat already exists between {} and {}, returning existing chat", 
+                    request.getCurrentUserId(), request.getRecipientId());
+            return existingChat;
+        }
 
         Chat chat = new Chat();
         chat.setId(UUID.randomUUID());
@@ -79,19 +89,30 @@ public class ChatService {
                     if (chat.getType() == ChatType.PRIVATE) {
                         List<ChatMember> chatMembers = chatMemberRepository.findByChatId(member.getChatId());
                         log.info("Chat members for chat {}: {}", chat.getId(), chatMembers.size());
-                        
+
                         ChatMember recipientMember = chatMembers.stream()
                                 .filter(m -> !m.getUserId().equals(userId))
                                 .findFirst()
                                 .orElse(null);
-                        
+
                         if (recipientMember != null) {
                             recipientId = recipientMember.getUserId();
                             User recipient = userRepository.findById(recipientId).orElse(null);
                             if (recipient != null) {
-                                recipientName = recipient.getDisplayName();
                                 recipientAvatar = recipient.getAvatarUrl();
-                                log.info("Found recipient: {} ({})", recipientName, recipientId);
+
+                                // Check if recipient is in user's contacts
+                                List<UserContact> userContacts = userContactRepository
+                                        .findByOwnerIdAndMatchedUserId(userId, recipientId);
+
+                                if (!userContacts.isEmpty()) {
+                                    // Use the first contact if multiple exist
+                                    recipientName = userContacts.get(0).getContactName();
+                                    log.info("Found recipient from contacts: {} ({})", recipientName, recipientId);
+                                } else {
+                                    recipientName = recipient.getDisplayName();
+                                    log.info("Recipient not in contacts, using display name: {} ({})", recipientName, recipientId);
+                                }
                             } else {
                                 log.warn("Recipient user not found for ID: {}", recipientId);
                             }
@@ -109,27 +130,35 @@ public class ChatService {
                 .toList();
     }
 
-    public ChatDto findOrCreatePrivateChat(UUID userId, UUID recipientId) {
-        // Check if a private chat already exists between these two users
+    private ChatDto findExistingPrivateChat(UUID userId, UUID recipientId) {
         List<ChatMember> userMemberships = chatMemberRepository.findByUserId(userId);
-        
+
         for (ChatMember membership : userMemberships) {
             Chat chat = chatRepository.findById(membership.getChatId()).orElse(null);
             if (chat != null && chat.getType() == ChatType.PRIVATE) {
                 List<ChatMember> chatMembers = chatMemberRepository.findByChatId(chat.getId());
                 boolean hasRecipient = chatMembers.stream()
                         .anyMatch(m -> m.getUserId().equals(recipientId));
-                
+
                 if (hasRecipient) {
                     // Chat exists, return it
                     User recipient = userRepository.findById(recipientId).orElse(null);
-                    return toDto(chat, recipientId, 
+                    return toDto(chat, recipientId,
                             recipient != null ? recipient.getDisplayName() : null,
                             recipient != null ? recipient.getAvatarUrl() : null);
                 }
             }
         }
-        
+        return null;
+    }
+
+    public ChatDto findOrCreatePrivateChat(UUID userId, UUID recipientId) {
+        // Check if a private chat already exists between these two users
+        ChatDto existingChat = findExistingPrivateChat(userId, recipientId);
+        if (existingChat != null) {
+            return existingChat;
+        }
+
         // No existing chat, create a new one
         PrivateChatRequestDto request = new PrivateChatRequestDto();
         request.setCurrentUserId(userId);

@@ -46,4 +46,14 @@ public class EmailService {
     public void logOtpForPhone(String phoneNumber, String otp) {
         log.info("OTP for phone number: {} is: {} (SMS integration needed for actual delivery)", phoneNumber, otp);
     }
+
+    public void sendInvitationEmail(String toEmail, String inviterName, String invitationLink) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(toEmail);
+        message.setSubject("Chatzy - You're Invited to Chat!");
+        message.setText("Hello,\n\n" + inviterName + " has invited you to join Chatzy!\n\nChatzy is a messaging app that lets you stay connected with friends and family through text, voice, and video calls.\n\nClick the link below to download the app and start chatting:\n\n" + invitationLink + "\n\nWe look forward to seeing you on Chatzy!\n\nBest regards,\nThe Chatzy Team");
+
+        mailSender.send(message);
+        log.info("Invitation email sent to: {} from: {}", toEmail, inviterName);
+    }
 }

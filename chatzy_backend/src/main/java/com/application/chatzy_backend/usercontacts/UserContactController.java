@@ -1,5 +1,6 @@
 package com.application.chatzy_backend.usercontacts;
 
+import com.application.chatzy_backend.usercontacts.dto.AddContactRequest;
 import com.application.chatzy_backend.usercontacts.dto.UserContactResponseDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -40,6 +41,24 @@ public class UserContactController {
         UUID ownerId = currentUserId(authentication);
         contactService.syncGoogleContacts(ownerId);
         return ResponseEntity.ok("Contacts synced successfully.");
+    }
+
+    @PostMapping
+    public ResponseEntity<UserContactResponseDto> addContact(
+            @RequestBody AddContactRequest request,
+            Authentication authentication) {
+        UUID ownerId = currentUserId(authentication);
+        UserContactResponseDto response = contactService.addContact(ownerId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<List<UserContactResponseDto>> searchContacts(
+            @RequestParam String query,
+            Authentication authentication) {
+        UUID ownerId = currentUserId(authentication);
+        List<UserContactResponseDto> results = contactService.searchContacts(ownerId, query);
+        return ResponseEntity.ok(results);
     }
 
     private UUID currentUserId(Authentication authentication) {

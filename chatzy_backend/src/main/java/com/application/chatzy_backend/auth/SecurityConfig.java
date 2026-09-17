@@ -53,7 +53,8 @@ public class SecurityConfig {
                                 "/ws-stomp/**",    // raw STOMP WebSocket sub-paths
                                 "/websocket-test.html",  // WebSocket test client
                                 "/health",
-                                "/v1/**"
+                                "/v1/**",
+                                "/api/calls/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
