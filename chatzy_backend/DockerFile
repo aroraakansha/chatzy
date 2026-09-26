@@ -19,4 +19,25 @@ COPY --from=build /app/target/*.jar app.jar
 EXPOSE 8080
 
 # Command to run the application
-ENTRYPOINT ["java", "-jar", "app.jar"]ß
+# Stage 1: Build the application using Maven
+FROM eclipse-temurin:25-jdk-jammy AS build
+WORKDIR /app
+
+# Copy the entire backend directory contents into the container
+COPY . .
+
+# Build the project and package it into a JAR file
+RUN ./mvnw clean package -DskipTests
+
+# Stage 2: Run the application
+FROM eclipse-temurin:25-jre-jammy
+WORKDIR /app
+
+# Copy the built JAR file from the first stage
+COPY --from=build /app/target/*.jar app.jar
+
+# Render assigns a dynamic port, but Spring Boot defaults to 8080
+EXPOSE 8080
+
+# Command to run the application
+ENTRYPOINT ["java", "-jar", "app.jar"]
