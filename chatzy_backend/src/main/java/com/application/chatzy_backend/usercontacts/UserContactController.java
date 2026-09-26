@@ -3,6 +3,7 @@ package com.application.chatzy_backend.usercontacts;
 import com.application.chatzy_backend.usercontacts.dto.AddContactRequest;
 import com.application.chatzy_backend.usercontacts.dto.UserContactResponseDto;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -15,6 +16,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/contacts")
 @RequiredArgsConstructor
+@Slf4j
 public class UserContactController {
 
     private final UserContactService contactService;
@@ -56,8 +58,11 @@ public class UserContactController {
     public ResponseEntity<List<UserContactResponseDto>> searchContacts(
             @RequestParam String query,
             Authentication authentication) {
+        log.info("GET /api/contacts/search - Query: {}", query);
         UUID ownerId = currentUserId(authentication);
+        log.info("GET /api/contacts/search - Owner ID: {}", ownerId);
         List<UserContactResponseDto> results = contactService.searchContacts(ownerId, query);
+        log.info("GET /api/contacts/search - Found {} results", results.size());
         return ResponseEntity.ok(results);
     }
 

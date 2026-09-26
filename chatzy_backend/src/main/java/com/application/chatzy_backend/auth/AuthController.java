@@ -3,6 +3,7 @@ package com.application.chatzy_backend.auth;
 import com.application.chatzy_backend.auth.dto.AuthResponse;
 import com.application.chatzy_backend.user.LoginRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -14,20 +15,25 @@ import com.application.chatzy_backend.user.User;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
+@Slf4j
 public class AuthController {
 
     private final AuthService authService;
 
     @PostMapping("/register")
     public ResponseEntity<String> register(@RequestBody RegisterRequest request) {
+        log.info("POST /api/auth/register - Email: {}, DisplayName: {}", request.getEmail(), request.getDisplayName());
         authService.register(request.getEmail(), request.getPassword(), request.getDisplayName());
+        log.info("POST /api/auth/register - Registration successful for email: {}", request.getEmail());
         return ResponseEntity.ok("User registered successfully");
     }
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
+        log.info("POST /api/auth/login - Email: {}", request.getEmail());
         User user = authService.login(request.getEmail(), request.getPassword());
         String token = authService.createToken(user);
+        log.info("POST /api/auth/login - Login successful for email: {}, User ID: {}", request.getEmail(), user.getId());
 
         return ResponseEntity.ok(new AuthResponse(token, "Login successful", user));
     }

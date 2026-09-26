@@ -47,12 +47,19 @@ public class AuthService {
     }
 
     public User login(String email, String password) {
+        log.info("Login attempt for email: {}", email);
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> {
+                    log.error("User not found for email: {}", email);
+                    return new RuntimeException("User not found");
+                });
 
-        if (!passwordEncoder.matches(password, user.getPasswordHash()))
+        if (!passwordEncoder.matches(password, user.getPasswordHash())) {
+            log.error("Invalid password for email: {}", email);
             throw new RuntimeException("Invalid password");
+        }
 
+        log.info("Login successful for email: {}, user ID: {}", email, user.getId());
         return user;
     }
 
@@ -66,7 +73,9 @@ public class AuthService {
     }
 
     public void register(String email, String password, String displayName) {
+        log.info("Registration attempt for email: {}, display name: {}", email, displayName);
         if (userRepository.findByEmail(email).isPresent()) {
+            log.error("Registration failed - user already exists for email: {}", email);
             throw new RuntimeException("User already exists");
         }
         User user = new User();
@@ -78,7 +87,8 @@ public class AuthService {
         // Generate a default username if one isn't provided
         user.setUsername(email.split("@")[0]);
 
-        userRepository.save(user);
+        User savedUser = userRepository.save(user);
+        log.info("Registration successful for email: {}, user ID: {}", email, savedUser.getId());
     }
 
     // FOR GOOGLE SIGNUP (OAuth2)
