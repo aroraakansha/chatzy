@@ -7,7 +7,7 @@ COPY . .
 
 # Build the project and package it into a JAR file
 RUN ./mvnw clean package -DskipTests
-ß
+
 # Stage 2: Run the application
 FROM eclipse-temurin:25-jre-jammy
 WORKDIR /app
