@@ -3,7 +3,7 @@ import axios from "axios";
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/api").replace(/\/$/, "");
 
 export type CallType = "AUDIO" | "VIDEO";
-export type CallStatus = "INITIATED" | "RINGING" | "CONNECTED" | "ENDED" | "REJECTED";
+export type CallStatus = "INITIATED" | "RINGING" | "CONNECTED" | "ENDED" | "REJECTED" | "FAILED";
 export type CallResponse = { callId: string; callerId: string; receiverId: string; type: CallType; status: CallStatus; chatId?: string | null; startedAt?: string | null; endedAt?: string | null; durationSeconds?: number | null };
 
 function headers(token: string) { return { Authorization: `Bearer ${token}` }; }
