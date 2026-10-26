@@ -1,22 +1,11 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { ThemeProvider } from "@/features/workspace/components/theme-provider";
 
 export const metadata: Metadata = {
-  title: "Chatzy",
-  description: "A production-grade WhatsApp-style messaging dashboard.",
+  title: "Chatzy — closer, every day",
+  description: "A little more human. A lot more connected.",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  return (
-    <html lang="en" className="h-full antialiased" suppressHydrationWarning>
-      <body className="min-h-full flex flex-col">
-        <ThemeProvider>{children}</ThemeProvider>
-      </body>
-    </html>
-  );
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  return <html lang="en" data-theme="dark"><body>{children}</body></html>;
 }

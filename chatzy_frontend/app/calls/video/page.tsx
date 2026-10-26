@@ -1,8 +1,2 @@
-"use client";
-
-import { AppShell } from "@/features/workspace/components/app-shell";
-import { CallScreen } from "@/features/call/components/call-screen";
-
-export default function VideoCallingPage() {
-  return <AppShell><CallScreen type="VIDEO" /></AppShell>;
-}
+import { ChatWorkspace } from "@/features/chat/chat-workspace";
+export default function VideoCallsPage() { return <ChatWorkspace initialArea="calls" />; }

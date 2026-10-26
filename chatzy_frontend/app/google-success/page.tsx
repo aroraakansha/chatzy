@@ -1,42 +1,17 @@
 "use client";
 
-import { CheckCircle2 } from "lucide-react";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { authService } from "@/features/auth/services/auth-service";
-import { useAuthStore } from "@/features/auth/store/auth-store";
+import { Suspense, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { api, saveSession } from "@/features/chat/api";
 
-export default function GoogleSuccessPage() {
-  const router = useRouter();
-  const setSession = useAuthStore((state) => state.setSession);
-  const [message, setMessage] = useState("Finishing your Google Contacts connection…");
-
+function CompleteGoogleSignIn() {
+  const params = useSearchParams(); const router = useRouter();
   useEffect(() => {
-    const token = new URLSearchParams(window.location.search).get("token");
-    if (!token) {
-      setMessage("Google did not return a session. Please try connecting your contacts again.");
-      return;
-    }
-
-    void authService.completeGoogleLogin(token)
-      .then((session) => {
-        setSession(session);
-        router.replace("/contacts");
-      })
-      .catch(() => {
-        setMessage("We couldn't finish connecting Google. Please try again.");
-      });
-  }, [router, setSession]);
-
-  return (
-    <main className="ambient-shell grid min-h-dvh place-items-center p-5">
-      <section className="w-full max-w-md rounded-[32px] border border-white/70 bg-white/90 p-8 text-center shadow-[0_24px_70px_rgb(28_45_38/0.14)] backdrop-blur-xl">
-        <span className="mx-auto grid size-14 place-items-center rounded-2xl bg-[#e7f7f1] text-[#008069]">
-          <CheckCircle2 size={28} />
-        </span>
-        <h1 className="mt-5 text-2xl font-semibold text-[#17211c]">Connect your contacts</h1>
-        <p className="mt-3 text-sm leading-6 text-[#66756f]">{message}</p>
-      </section>
-    </main>
-  );
+    const token = params.get("token");
+    if (!token) { router.replace("/login"); return; }
+    void api.me(token).then((user) => { saveSession({ token, user }); router.replace("/dashboard"); }).catch(() => router.replace("/login?error=google"));
+  }, [params, router]);
+  return <main className="loading-screen"><span className="logo-orbit">c</span><span>Bringing you back to your people…</span></main>;
 }
+
+export default function GoogleSuccessPage() { return <Suspense fallback={<main className="loading-screen"><span className="logo-orbit">c</span><span>Finding your people…</span></main>}><CompleteGoogleSignIn /></Suspense>; }

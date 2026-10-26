@@ -1,0 +1,12 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { ArrowLeft, ArrowRight, AtSign, LockKeyhole, MessageCircle } from "lucide-react";
+import { api } from "@/features/chat/api";
+
+export function RecoveryPage({ reset = false }: { reset?: boolean }) {
+  const [email, setEmail] = useState(""); const [password, setPassword] = useState(""); const [token, setToken] = useState(""); const [busy, setBusy] = useState(false); const [error, setError] = useState(""); const [success, setSuccess] = useState("");
+  useEffect(() => { setToken(new URLSearchParams(window.location.search).get("token") || ""); }, []);
+  async function submit(event: React.FormEvent) { event.preventDefault(); setBusy(true); setError(""); setSuccess(""); try { const result = reset ? await api.resetPassword(token, password) : await api.forgotPassword(email); setSuccess(result || (reset ? "Your password has been updated." : "Check your email for a reset link.")); } catch (cause) { setError(cause instanceof Error ? cause.message : "Please try again."); } finally { setBusy(false); } }
+  return <main className="recovery-shell"><a className="brand-lockup recovery-brand" href="/login"><span className="brand-symbol"><MessageCircle size={19} fill="currentColor" /></span>chatzy<span className="brand-dot">.</span></a><form className="recovery-card" onSubmit={(event) => void submit(event)}><a className="recovery-back" href="/login"><ArrowLeft size={14} /> Back to sign in</a><span className="eyebrow">A FRESH START</span><h1>{reset ? "Choose a new password." : "Forgot something?"}</h1><p>{reset ? "Pick a new password and get right back to your people." : "We’ll send a little reset link to the email on your account."}</p>{error && <div className="alert alert-error">{error}</div>}{success && <div className="alert alert-success">{success}</div>}{reset ? <label className="field"><span>New password</span><span className="field-control"><LockKeyhole size={16} /><input required minLength={6} type="password" value={password} onChange={(event) => setPassword(event.target.value)} /></span></label> : <label className="field"><span>Email address</span><span className="field-control"><AtSign size={16} /><input required type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@example.com" /></span></label>}<button className="button button-primary recovery-submit" disabled={busy}>{busy ? "One second…" : reset ? "Update password" : "Send my reset link"}<ArrowRight size={16} /></button></form></main>;
+}

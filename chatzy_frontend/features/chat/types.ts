@@ -1,0 +1,7 @@
+export type User = { id: string; name: string; email: string; phone?: string; avatarUrl?: string };
+export type Session = { token: string; message?: string; user: User };
+export type Chat = { chatId: string; recipientId?: string; recipientName?: string; recipientAvatar?: string; chatName?: string; avatarUrl?: string; type: "PRIVATE" | "GROUP"; lastActivityAt?: string; pinnedMessageId?: string };
+export type Contact = { id: string; contactName?: string; contactEmail?: string; contactPhone?: string; matchedUserId?: string; matchedUserDisplayName?: string; isFavorite?: boolean; isBlocked?: boolean };
+export type Message = { id?: string; chatId: string; senderId: string; recipientId: string; content?: string; attachmentUrl?: string; mediaUrl?: string; mediaMimeType?: string; mediaSizeBytes?: number; mediaDurationSecs?: number; type?: "TEXT" | "IMAGE" | "VIDEO" | "AUDIO" | "FILE"; status?: "SENT" | "DELIVERED" | "READ"; sentAt?: string; createdAt?: string; editedAt?: string; isEdited?: boolean; isDeleted?: boolean; replyToMessageId?: string; clientTempId?: string; readAt?: string };
+export type Page<T> = { content: T[]; totalPages: number; totalElements: number; number: number; last: boolean; first: boolean };
+export type Call = { callId: string; callerId: string; receiverId: string; type: "AUDIO" | "VIDEO"; status: string; chatId: string; startedAt?: string; endedAt?: string; durationSeconds?: number };

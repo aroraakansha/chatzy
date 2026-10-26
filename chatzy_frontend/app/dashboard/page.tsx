@@ -1,14 +1,3 @@
-import { ChatDashboard } from "@/app/dashboard/chat-dashboard";
-import { getConversationSnapshot } from "@/features/chat/services/chat-service";
-import { CallNotifications } from "@/features/call/components/call-notifications";
+import { ChatWorkspace } from "@/features/chat/chat-workspace";
 
-export default function DashboardPage() {
-  const snapshot = getConversationSnapshot();
-
-  return (
-    <>
-      <CallNotifications />
-      <ChatDashboard snapshot={snapshot} />
-    </>
-  );
-}
+export default function DashboardPage() { return <ChatWorkspace />; }
