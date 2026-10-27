@@ -14,7 +14,6 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
-    @Async
     public void sendOtpEmail(String toEmail, String otp) {
         try {
             SimpleMailMessage message = new SimpleMailMessage();
@@ -26,6 +25,7 @@ public class EmailService {
             log.info("OTP email sent to: {}", toEmail);
         } catch (Exception e) {
             log.error("Failed to send OTP email to: {}", toEmail, e);
+            throw new IllegalStateException("Verification email could not be sent. Please try again later.", e);
         }
     }
 
