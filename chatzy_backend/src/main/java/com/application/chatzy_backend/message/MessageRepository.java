@@ -22,4 +22,6 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
 
     @Query("SELECT m FROM Message m WHERE m.chatId = :chatId AND m.content LIKE %:query% ORDER BY m.sentAt DESC")
     Page<Message> searchMessagesInChat(@Param("chatId") UUID chatId, @Param("query") String query, Pageable pageable);
+
+    List<Message> findByReplyToMessageIdOrderBySentAtAsc(UUID replyToMessageId);
 }

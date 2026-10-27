@@ -110,8 +110,10 @@ public class ChatService {
                                     recipientName = userContacts.get(0).getContactName();
                                     log.info("Found recipient from contacts: {} ({})", recipientName, recipientId);
                                 } else {
-                                    recipientName = recipient.getDisplayName();
-                                    log.info("Recipient not in contacts, using display name: {} ({})", recipientName, recipientId);
+                                    // Not in contacts, show phone number for privacy, fallback to email
+                                    log.info("Recipient phone: '{}', email: '{}', display name: '{}'", recipient.getPhone(), recipient.getEmail(), recipient.getDisplayName());
+                                    recipientName = recipient.getPhone() != null ? recipient.getPhone() : recipient.getEmail();
+                                    log.info("Recipient not in contacts, using: {} ({})", recipientName, recipientId);
                                 }
                             } else {
                                 log.warn("Recipient user not found for ID: {}", recipientId);
@@ -143,9 +145,22 @@ public class ChatService {
                 if (hasRecipient) {
                     // Chat exists, return it
                     User recipient = userRepository.findById(recipientId).orElse(null);
-                    return toDto(chat, recipientId,
-                            recipient != null ? recipient.getDisplayName() : null,
-                            recipient != null ? recipient.getAvatarUrl() : null);
+                    if (recipient != null) {
+                        // Check if recipient is in user's contacts
+                        List<UserContact> userContacts = userContactRepository
+                                .findByOwnerIdAndMatchedUserId(userId, recipientId);
+                        
+                        String recipientName;
+                        if (!userContacts.isEmpty()) {
+                            recipientName = userContacts.get(0).getContactName();
+                        } else {
+                            // Not in contacts, show phone number for privacy, fallback to email
+                            recipientName = recipient.getPhone() != null ? recipient.getPhone() : recipient.getEmail();
+                        }
+                        
+                        return toDto(chat, recipientId, recipientName, recipient.getAvatarUrl());
+                    }
+                    return toDto(chat, recipientId, null, null);
                 }
             }
         }
@@ -196,5 +211,64 @@ public class ChatService {
         chat.setType(dto.getType());
 
         return chat;
+    }
+
+    public ChatDto pinMessage(UUID chatId, UUID messageId) {
+        Chat chat = chatRepository.findById(chatId)
+                .orElseThrow(() -> new RuntimeException("Chat not found"));
+        chat.setPinnedMessageId(messageId);
+        chat = chatRepository.save(chat);
+        return toDto(chat, null, null, null);
+    }
+
+    public ChatDto unpinMessage(UUID chatId) {
+        Chat chat = chatRepository.findById(chatId)
+                .orElseThrow(() -> new RuntimeException("Chat not found"));
+        chat.setPinnedMessageId(null);
+        chat = chatRepository.save(chat);
+        return toDto(chat, null, null, null);
+    }
+
+    public ChatDto createGroupChat(UUID ownerId, CreateGroupChatRequest request) {
+        Chat chat = new Chat();
+        chat.setId(UUID.randomUUID());
+        chat.setType(ChatType.GROUP);
+        chat.setName(request.getName());
+        chat.setDescription(request.getDescription());
+        chat.setCreatedBy(ownerId);
+        chat.setCreatedAt(OffsetDateTime.now());
+        chat.setLastActivityAt(OffsetDateTime.now());
+
+        chat = chatRepository.save(chat);
+
+        // Add owner as admin
+        ChatMember ownerMember = new ChatMember();
+        ownerMember.setId(UUID.randomUUID());
+        ownerMember.setChatId(chat.getId());
+        ownerMember.setUserId(ownerId);
+        ownerMember.setRole(MemberRole.ADMIN);
+        ownerMember.setIsMuted(false);
+        ownerMember.setIsArchived(false);
+        ownerMember.setJoinedAt(OffsetDateTime.now());
+        chatMemberRepository.save(ownerMember);
+
+        // Add other members
+        if (request.getMemberIds() != null) {
+            for (UUID memberId : request.getMemberIds()) {
+                if (!memberId.equals(ownerId)) {
+                    ChatMember member = new ChatMember();
+                    member.setId(UUID.randomUUID());
+                    member.setChatId(chat.getId());
+                    member.setUserId(memberId);
+                    member.setRole(MemberRole.MEMBER);
+                    member.setIsMuted(false);
+                    member.setIsArchived(false);
+                    member.setJoinedAt(OffsetDateTime.now());
+                    chatMemberRepository.save(member);
+                }
+            }
+        }
+
+        return toDto(chat, null, null, null);
     }
 }

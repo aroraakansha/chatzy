@@ -76,4 +76,7 @@ public class Message {
 
     @Column(name = "is_edited")
     private Boolean isEdited;
+
+    @Column(name = "read_at")
+    private LocalDateTime readAt;
 }

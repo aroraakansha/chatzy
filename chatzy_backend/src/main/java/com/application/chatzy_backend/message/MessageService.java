@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -28,6 +29,7 @@ public class MessageService {
     private final MessageRepository messageRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final UserRepository userRepository;
+    private final MessageReactionRepository reactionRepository;
 
     @Autowired(required = false)
     private S3Service s3Service;
@@ -234,6 +236,7 @@ public class MessageService {
         dto.setReplyToMessageId(entity.getReplyToMessageId());
         dto.setIsDeleted(entity.getIsDeleted());
         dto.setIsEdited(entity.getIsEdited());
+        dto.setReadAt(entity.getReadAt());
 
         return dto;
     }
@@ -271,5 +274,62 @@ public class MessageService {
         if (senderPrincipal != null) {
             messagingTemplate.convertAndSendToUser(senderPrincipal, "/queue/messages", outgoing);
         }
+    }
+
+    public MessageReaction addReaction(UUID messageId, String emoji, Authentication authentication) {
+        String email = authentication.getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Check if reaction already exists
+        Optional<MessageReaction> existing = reactionRepository.findByMessageIdAndUserId(messageId, user.getId());
+        if (existing.isPresent()) {
+            // Update existing reaction
+            MessageReaction reaction = existing.get();
+            reaction.setEmoji(emoji);
+            return reactionRepository.save(reaction);
+        }
+
+        // Create new reaction
+        MessageReaction reaction = MessageReaction.builder()
+                .messageId(messageId)
+                .userId(user.getId())
+                .emoji(emoji)
+                .build();
+        return reactionRepository.save(reaction);
+    }
+
+    public void removeReaction(UUID messageId, Authentication authentication) {
+        String email = authentication.getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        reactionRepository.deleteByMessageIdAndUserId(messageId, user.getId());
+    }
+
+    public List<MesssageDto> getReplies(UUID messageId) {
+        return messageRepository.findByReplyToMessageIdOrderBySentAtAsc(messageId)
+                .stream()
+                .map(this::toDto)
+                .toList();
+    }
+
+    public MesssageDto markAsRead(UUID messageId, Authentication authentication) {
+        String email = authentication.getName();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Message message = messageRepository.findById(messageId)
+                .orElseThrow(() -> new RuntimeException("Message not found"));
+
+        // Only recipient can mark as read
+        if (!message.getRecipientId().equals(user.getId())) {
+            throw new RuntimeException("Only the recipient can mark a message as read");
+        }
+
+        message.setReadAt(LocalDateTime.now());
+        message = messageRepository.save(message);
+
+        return toDto(message);
     }
 }

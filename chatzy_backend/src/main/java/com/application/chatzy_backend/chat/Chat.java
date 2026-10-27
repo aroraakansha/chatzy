@@ -45,4 +45,7 @@ public class Chat {
 
     @Column(name = "created_at")
     private OffsetDateTime createdAt;
+
+    @Column(name = "pinned_message_id")
+    private UUID pinnedMessageId;
 }

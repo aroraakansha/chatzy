@@ -39,6 +39,26 @@ public class ChatController {
         return ResponseEntity.ok(chat);
     }
 
+    @PostMapping("/{chatId}/pins")
+    public ResponseEntity<ChatDto> pinMessage(
+            @PathVariable UUID chatId,
+            @RequestBody PinMessageRequest request) {
+        return ResponseEntity.ok(chatService.pinMessage(chatId, request.getMessageId()));
+    }
+
+    @DeleteMapping("/{chatId}/pins")
+    public ResponseEntity<ChatDto> unpinMessage(@PathVariable UUID chatId) {
+        return ResponseEntity.ok(chatService.unpinMessage(chatId));
+    }
+
+    @PostMapping("/groups")
+    public ResponseEntity<ChatDto> createGroupChat(
+            @RequestBody CreateGroupChatRequest request,
+            Authentication authentication) {
+        UUID userId = currentUserId(authentication);
+        return ResponseEntity.ok(chatService.createGroupChat(userId, request));
+    }
+
     private UUID currentUserId(Authentication authentication) {
         String email = authentication.getName();
         return userRepository.findByEmail(email)

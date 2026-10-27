@@ -17,9 +17,15 @@ public record UserContactResponseDto(
         boolean isBlocked
 ) {
     public static UserContactResponseDto from(UserContact contact) {
+        // If contact is saved, show saved name; otherwise show real user name
+        String displayName = contact.getContactName();
+        if (contact.getMatchedUser() != null && displayName == null) {
+            displayName = contact.getMatchedUser().getDisplayName();
+        }
+        
         return new UserContactResponseDto(
                 contact.getId(),
-                contact.getContactName(),
+                displayName,
                 contact.getContactEmail(),
                 contact.getContactPhone(),
                 contact.getMatchedUser() != null ? contact.getMatchedUser().getId() : null,

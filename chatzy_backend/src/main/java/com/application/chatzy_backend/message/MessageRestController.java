@@ -2,6 +2,7 @@ package com.application.chatzy_backend.message;
 
 import com.application.chatzy_backend.message.dto.VoiceMessageRequest;
 import com.application.chatzy_backend.message.dto.MediaMessageRequest;
+import com.application.chatzy_backend.message.dto.ReactionRequest;
 import com.application.chatzy_backend.s3.S3Service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -9,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -144,5 +146,33 @@ public class MessageRestController {
             return "application/pdf";
         }
         return "application/octet-stream";
+    }
+
+    @PostMapping("/{messageId}/reactions")
+    public ResponseEntity<MessageReaction> addReaction(
+            @PathVariable UUID messageId,
+            @RequestBody ReactionRequest request,
+            Authentication authentication) {
+        return ResponseEntity.ok(messageService.addReaction(messageId, request.getEmoji(), authentication));
+    }
+
+    @DeleteMapping("/{messageId}/reactions")
+    public ResponseEntity<Void> removeReaction(
+            @PathVariable UUID messageId,
+            Authentication authentication) {
+        messageService.removeReaction(messageId, authentication);
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/{messageId}/replies")
+    public ResponseEntity<List<MesssageDto>> getReplies(@PathVariable UUID messageId) {
+        return ResponseEntity.ok(messageService.getReplies(messageId));
+    }
+
+    @PatchMapping("/{messageId}/read")
+    public ResponseEntity<MesssageDto> markAsRead(
+            @PathVariable UUID messageId,
+            Authentication authentication) {
+        return ResponseEntity.ok(messageService.markAsRead(messageId, authentication));
     }
 }

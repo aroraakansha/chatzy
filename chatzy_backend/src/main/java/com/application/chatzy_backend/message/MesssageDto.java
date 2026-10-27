@@ -49,4 +49,6 @@ public class MesssageDto {
     private UUID replyToMessageId;
 
     private String clientTempId; // wire-only, never persisted
+
+    private LocalDateTime readAt;
 }

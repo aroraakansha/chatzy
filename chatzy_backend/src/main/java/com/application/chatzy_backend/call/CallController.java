@@ -13,6 +13,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/calls")
@@ -23,6 +24,11 @@ public class CallController {
     private final CallService callService;
     private final UserRepository userRepository;
     private final WebRtcSignalingService webRtcSignalingService;
+
+    @GetMapping("/history")
+    public ResponseEntity<List<CallResponse>> getCallHistory(Authentication authentication) {
+        return ResponseEntity.ok(callService.getCallHistory(currentUserId(authentication)));
+    }
 
     @PostMapping("/initiate")
     public ResponseEntity<CallResponse> initiateCall(

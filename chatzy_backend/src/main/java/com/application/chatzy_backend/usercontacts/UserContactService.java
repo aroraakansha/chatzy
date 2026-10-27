@@ -200,7 +200,18 @@ public class UserContactService {
 
     @Transactional(readOnly = true)
     public List<UserContactResponseDto> searchContacts(UUID ownerId, String query) {
+        log.info("Searching contacts for owner: {}, query: '{}'", ownerId, query);
         List<UserContact> contacts = contactRepository.searchContacts(ownerId, query);
+        log.info("Search returned {} contacts", contacts.size());
+        
+        // Log all contacts for this owner for debugging
+        List<UserContact> allContacts = contactRepository.findByOwnerId(ownerId);
+        log.info("Total contacts for owner {}: {}", ownerId, allContacts.size());
+        for (UserContact c : allContacts) {
+            log.info("Contact: name='{}', email='{}', phone='{}'", 
+                c.getContactName(), c.getContactEmail(), c.getContactPhone());
+        }
+        
         return contacts.stream()
                 .map(UserContactResponseDto::from)
                 .toList();

@@ -6,6 +6,7 @@ import com.application.chatzy_backend.enums.UserStatus;
 import com.application.chatzy_backend.otp.OtpService;
 import com.application.chatzy_backend.passwordreset.PasswordResetToken;
 import com.application.chatzy_backend.passwordreset.PasswordResetTokenRepository;
+import com.application.chatzy_backend.ratelimit.LoginRateLimiterService;
 import com.application.chatzy_backend.security.JwtUtils; // Ensure this import is correct
 import com.application.chatzy_backend.user.User;
 import com.application.chatzy_backend.user.UserRepository;
@@ -32,6 +33,7 @@ public class AuthService {
     private final OtpService otpService;
     private final EmailService emailService;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final LoginRateLimiterService loginRateLimiterService;
 
     @Value("${app.frontend.url:http://localhost:3000}")
     private String frontendUrl;
@@ -48,6 +50,13 @@ public class AuthService {
 
     public User login(String email, String password) {
         log.info("Login attempt for email: {}", email);
+
+        // Check if user is blocked
+        if (loginRateLimiterService.isBlocked(email)) {
+            Long remainingTime = loginRateLimiterService.getBlockRemainingTime(email);
+            throw new RuntimeException("Account temporarily locked due to too many failed attempts. Try again in " + remainingTime + " seconds.");
+        }
+
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> {
                     log.error("User not found for email: {}", email);
@@ -56,8 +65,16 @@ public class AuthService {
 
         if (!passwordEncoder.matches(password, user.getPasswordHash())) {
             log.error("Invalid password for email: {}", email);
-            throw new RuntimeException("Invalid password");
+            boolean shouldBlock = loginRateLimiterService.recordFailedAttempt(email);
+            if (shouldBlock) {
+                throw new RuntimeException("Too many failed login attempts. Account locked for 5 hours.");
+            }
+            int remaining = loginRateLimiterService.getRemainingAttempts(email);
+            throw new RuntimeException("Invalid password. " + remaining + " attempts remaining before account lock.");
         }
+
+        // Reset failed attempts on successful login
+        loginRateLimiterService.resetAttempts(email);
 
         log.info("Login successful for email: {}, user ID: {}", email, user.getId());
         return user;

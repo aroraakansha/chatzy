@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Comparator;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -79,6 +80,13 @@ public class CallService {
 
         log.info("Call initiated and ringing: {} from {} to {}", call.getId(), callerId, request.getReceiverId());
         return response;
+    }
+
+    public List<CallResponse> getCallHistory(UUID userId) {
+        return callRepository.findByCallerIdOrReceiverId(userId, userId).stream()
+                .sorted(Comparator.comparing(Call::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
+                .map(this::toDto)
+                .toList();
     }
 
     public CallResponse answerCall(UUID callId, UUID receiverId) {
